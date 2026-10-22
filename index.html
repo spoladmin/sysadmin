@@ -4,7 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#101211">
-    <title>Системный администратор</title>
+  <meta name="description" content="Интерактивный терминал системного администратора.">
+  <title>Системный администратор</title>
   <style>
     :root { color-scheme: dark; background: #101211; color: #ced8ce; }
     * { box-sizing: border-box; }
@@ -31,54 +32,111 @@
       .terminal { min-width: 0; font-size: clamp(20px, 5.6vw, 24px); }
     }
     @media (prefers-reduced-motion: reduce) { main { animation: none; } .cursor { animation: none; } }
-  </style>
+  
+html, body { max-width:100%; overflow-x:hidden; }
+.terminal { min-width:0; }
+.entry { display:flex; flex-wrap:wrap; align-items:baseline; gap:0 .6ch; }
+.entry[hidden] { display:none; }
+.entry .prompt { white-space:pre; }
+textarea { flex:1; min-width:4ch; width:4ch; max-width:100%; resize:none; border:0;
+border-radius:0; outline:none; padding:0; margin:0; background:transparent;
+color:#e0e3de; caret-color:#b8c9b6; font:inherit; line-height:inherit;
+overflow:hidden; overflow-wrap:anywhere; white-space:pre-wrap; }
+.entry:focus-within .prompt { color:#b8c9b6; }
+</style>
 </head>
 <body>
   <main aria-label="Терминал">
     <h1 class="sr-only">Системный администратор</h1>
-    <div class="terminal" aria-hidden="true" id="terminal"><p class="line"><span class="prompt" id="command"></span><span class="cursor" id="cursor"></span></p></div>
+    <div class="terminal" id="terminal"><p class="line"><span class="prompt" id="command"></span><span class="cursor" id="cursor"></span></p></div>
     <noscript><p class="line">admin@localhost:~$ whoami<br>Системный администратор<br>admin@localhost:~$</p></noscript>
   </main>
   <script>
-    (() => {
-      'use strict';
-      const prompt = 'admin@localhost:~$';
-      const terminal = document.getElementById('terminal');
-      const command = document.getElementById('command');
-      const cursor = document.getElementById('cursor');
-      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      const pause = ms => new Promise(resolve => window.setTimeout(resolve, ms));
-      function newLine(className) {
-        const line = document.createElement('p');
-        line.className = 'line';
-        const text = document.createElement('span');
-        text.className = className;
-        line.append(text, cursor);
-        terminal.append(line);
-        return text;
-      }
-      async function type(target, text, delay) {
-        for (const character of text) {
-          target.append(document.createTextNode(character));
-          await pause(delay);
-        }
-      }
-      async function run() {
-        if (reducedMotion) {
-          command.textContent = prompt + ' whoami';
-          newLine('answer').textContent = 'Системный администратор';
-          newLine('prompt').textContent = prompt + ' ';
-          return;
-        }
-        await pause(850);
-        await type(command, prompt + ' whoami', 58);
-        await pause(650);
-        await type(newLine('answer'), 'Системный администратор', 65);
-        await pause(450);
-        newLine('prompt').textContent = prompt + ' ';
-      }
-      run();
-    })();
-  </script>
+(() => {
+  'use strict';
+  const prompt = 'admin@localhost:~$';
+  const terminal = document.getElementById('terminal');
+  const command = document.getElementById('command');
+  const cursor = document.getElementById('cursor');
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
+  const entry = document.createElement('div');
+  entry.className = 'entry'; entry.hidden = true;
+  const label = document.createElement('label');
+  label.className = 'prompt'; label.htmlFor = 'input'; label.textContent = prompt;
+  const input = document.createElement('textarea');
+  input.id = 'input'; input.rows = 1;
+  input.setAttribute('aria-label', 'Команда терминала. Введите help для списка команд.');
+  for (const [key,value] of Object.entries({enterkeyhint:'send',autocapitalize:'off',autocomplete:'off',autocorrect:'off'})) input.setAttribute(key,value);
+  input.spellcheck = false;
+  entry.append(label,input);
+  function resize() { input.style.height='auto'; input.style.height=input.scrollHeight+'px'; }
+  function scroll() { entry.scrollIntoView({block:'nearest'}); }
+  function print(text, className='answer') {
+    const line=document.createElement('p'); line.className='line '+className;
+    line.textContent=text; terminal.insertBefore(line,entry.parentNode ? entry : null);
+    return line;
+  }
+  function newLine(className) {
+    const line=print('',className), text=document.createElement('span');
+    line.append(text,cursor); return text;
+  }
+  async function type(target,text,delay) {
+    for (const character of text) { target.append(document.createTextNode(character)); await pause(delay); }
+  }
+  function showPrompt(focus=false) {
+    entry.hidden=false; input.disabled=false; resize();
+    if (focus) input.focus({preventScroll:true}); scroll();
+  }
+  async function submit() {
+    if (entry.hidden || input.disabled) return;
+    const raw=input.value.replace(/[\r\n]+/g,' '), cmd=raw.trim();
+    print(prompt+' '+raw,'prompt'); input.value=''; resize();
+    if (!cmd) { scroll(); return; }
+    const normalized=cmd.replace(/\s+/g,' ');
+    if (normalized==='clear') {
+      for (const child of [...terminal.children]) if (child!==entry) child.remove();
+    } else if (/^echo(?:\s|$)/.test(cmd)) {
+      print(cmd.replace(/^echo(?:\s)?/,''));
+    } else if (normalized==='date') {
+      print(new Date().toLocaleString());
+    } else if (normalized==='exit') {
+      print('Connection closed.'); input.disabled=true; entry.hidden=true;
+      await pause(850); showPrompt(true); return;
+    } else {
+      const replies={
+        'help':'help · whoami · hostname · date · clear\nls · cat README · echo <текст>\nsu · sudo su · coffee · exit',
+        'whoami':'Системный администратор', 'hostname':'localhost',
+        'ls':'documents  coffee  backups',
+        'cat README':'Добро пожаловать в кабинет системного администратора.',
+        'su':'Authentication required', 'sudo su':'Permission denied. Ask the sysadmin.',
+        'coffee':'Status: required'
+      };
+      print(Object.prototype.hasOwnProperty.call(replies,normalized) ? replies[normalized] : 'command not found: '+cmd);
+    }
+    scroll();
+  }
+  input.addEventListener('input',event=>{
+    if (!event.isComposing && /[\r\n]/.test(input.value)) { void submit(); return; } resize();
+  });
+  input.addEventListener('keydown',event=>{
+    if (event.key==='Enter' && !event.isComposing) { event.preventDefault(); void submit(); }
+  });
+  terminal.addEventListener('click',()=>{
+    if (!entry.hidden && !window.getSelection()?.toString()) input.focus({preventScroll:true});
+  });
+  window.addEventListener('resize',resize);
+  async function run() {
+    if (reducedMotion) {
+      command.textContent=prompt+' whoami'; newLine('answer').textContent='Системный администратор';
+    } else {
+      await pause(850); await type(command,prompt+' whoami',58); await pause(650);
+      await type(newLine('answer'),'Системный администратор',65); await pause(450);
+    }
+    cursor.remove(); terminal.append(entry); showPrompt();
+  }
+  void run();
+})();
+</script>
 </body>
 </html>
