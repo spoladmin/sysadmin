@@ -38,12 +38,12 @@
   <main aria-label="Терминал">
     <h1 class="sr-only">Системный администратор</h1>
     <div class="terminal" aria-hidden="true" id="terminal"><p class="line"><span class="prompt" id="command"></span><span class="cursor" id="cursor"></span></p></div>
-    <noscript><p class="line">root@rachmaninov-school:~# whoami<br>Системный администратор<br>root@rachmaninov-school:~#</p></noscript>
+    <noscript><p class="line">admin@localhost:~$ whoami<br>Системный администратор<br>admin@localhost:~$</p></noscript>
   </main>
   <script>
     (() => {
       'use strict';
-      const prompt = 'root@rachmaninov-school:~#';
+      const prompt = 'admin@localhost:~$';
       const terminal = document.getElementById('terminal');
       const command = document.getElementById('command');
       const cursor = document.getElementById('cursor');
